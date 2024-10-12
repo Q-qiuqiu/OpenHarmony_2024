@@ -1,0 +1,38 @@
+FROM openeuler-22.03-lts-sp3
+
+# 备份并替换YUM仓库文件
+RUN mv /etc/yum.repos.d/openEuler.repo /etc/yum.repos.d/openEuler.repo.bak
+COPY repo.txt /etc/yum.repos.d/openEuler.repo
+
+# 安装必要的工具，包括cmake和opencv
+RUN yum install -y python3-pip 
+RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
+    pip3 install numpy && pip3 install Pillow && pip3 install flask
+COPY src /bert/src
+COPY scripts /bert/scripts
+COPY acllite /bert/acllite
+COPY model /bert/model
+
+ENV CPU_ARCH=$(arch) \
+    THIRDPART_PATH=${HOME}/Ascend/thirdpart/${CPU_ARCH} \
+    INSTALL_DIR=${HOME}/Ascend/ascend-toolkit/latest \
+    PYTHONPATH=${THIRDPART_PATH}/acllite:$PYTHONPATH
+# 设置工作目录
+WORKDIR /bert
+
+RUN mkdir -p ${THIRDPART_PATH} && cp -r acllite ${THIRDPART_PATH}
+
+# 设置Ascend环境变量
+ENV ASCEND_TOOLKIT_HOME=/usr/local/Ascend/ascend-toolkit/latest \
+    LD_LIBRARY_PATH=/usr/local/Ascend/ascend-toolkit/latest/lib64:/usr/local/Ascend/ascend-toolkit/latest/lib64/plugin/opskernel:/usr/local/Ascend/ascend-toolkit/latest/lib64/plugin/nnengine:/usr/local/Ascend/ascend-toolkit/latest/x86_64-linux/devlib/:/usr/local/Ascend/driver/lib64:${LD_LIBRARY_PATH} \
+    PYTHONPATH=/usr/local/Ascend/ascend-toolkit/latest/python/site-packages:/usr/local/Ascend/ascend-toolkit/latest/opp/op_impl/built-in/ai_core/tbe:$THIRDPART_PATH/acllite:$PYTHONPATH \
+    PATH=/usr/local/Ascend/ascend-toolkit/latest/bin:/usr/local/Ascend/ascend-toolkit/latest/compiler/ccec_compiler/bin:$PATH \
+    ASCEND_AICPU_PATH=/usr/local/Ascend/ascend-toolkit/latest \
+    ASCEND_OPP_PATH=/usr/local/Ascend/ascend-toolkit/latest/opp \
+    TOOLCHAIN_HOME=/usr/local/Ascend/ascend-toolkit/latest/toolkit \
+    ASCEND_HOME_PATH=/usr/local/Ascend/ascend-toolkit/latest \
+    TMOUT=3600
+# 设置工作目录
+WORKDIR /bert/src
+# 运行文字分类程序
+CMD ["python3", "bert_text_classification.py"]
